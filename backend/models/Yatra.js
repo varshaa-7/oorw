@@ -1,6 +1,10 @@
 import mongoose from 'mongoose';
 
 const yatraSchema = new mongoose.Schema({
+  _id: {
+    type: Number,
+    required: true,
+  },
   title: {
     type: String,
     required: true,

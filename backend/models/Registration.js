@@ -49,7 +49,7 @@ const registrationSchema = new mongoose.Schema({
     medications: String
   },
   selectedYatra: {
-    type: mongoose.Schema.Types.ObjectId,
+    type: Number,
     ref: 'Yatra',
     required: true
   },
