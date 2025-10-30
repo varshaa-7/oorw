@@ -1,0 +1,26 @@
+[
+  {
+    "id": 1,
+    "title": "Kashi Vishwanath Yatra",
+    "destination": "Varanasi",
+    "duration": "3 Days / 2 Nights",
+    "price": 15000,
+    "imageUrl": "/images/kashi.jpg"
+  },
+  {
+    "id": 2,
+    "title": "Char Dham Yatra",
+    "destination": "Uttarakhand",
+    "duration": "10 Days / 9 Nights",
+    "price": 45000,
+    "imageUrl": "/images/char-dham.jpg"
+  },
+  {
+    "id": 3,
+    "title": "Ayodhya Ram Mandir Darshan",
+    "destination": "Ayodhya",
+    "duration": "2 Days / 1 Night",
+    "price": 10000,
+    "imageUrl": "/images/ayodhya.jpg"
+  }
+]

@@ -1,0 +1,74 @@
+@import "tailwindcss";
+
+/* 
+@keyframes fadeInUp {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeInUp {
+  animation: fadeInUp 0.8s ease-out forwards;
+}
+
+.animate-delay-200 {
+  animation-delay: 0.2s;
+}
+
+.animate-delay-400 {
+  animation-delay: 0.4s;
+}
+
+.animate-delay-600 {
+  animation-delay: 0.6s;
+} */
+
+/* Fade in & Up */
+@keyframes fadeInUp {
+  0% { opacity: 0; transform: translateY(20px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fadeInUp { animation: fadeInUp 0.8s ease-out forwards; }
+.animate-delay-200 { animation-delay: 0.2s; }
+.animate-delay-400 { animation-delay: 0.4s; }
+.animate-delay-600 { animation-delay: 0.6s; }
+
+/* Floating orbs */
+@keyframes float {
+  0% { transform: translateY(0px) translateX(0px); opacity: 0.7; }
+  50% { transform: translateY(-20px) translateX(10px); opacity: 0.9; }
+  100% { transform: translateY(0px) translateX(0px); opacity: 0.7; }
+}
+
+.animate-float { animation: float 6s ease-in-out infinite; }
+.animation-delay-200 { animation-delay: 2s; }
+.animation-delay-400 { animation-delay: 4s; }
+.animation-delay-600 { animation-delay: 6s; }
+
+
+@layer base {
+  :root {
+    --color-orange-50: #fff7ed;
+    --color-orange-100: #ffedd5;
+  --color-orange-200: #fed7aa;
+  --color-orange-300: #fdba74;
+  --color-orange-400: #fb923c;
+  --color-orange-500: #f97316;
+  --color-orange-600: #ea580c;
+  --color-orange-700: #c2410c;
+  --color-orange-800: #9a3412;
+  --color-orange-900: #7c2d12;
+}
+
+body {
+  background-color: var(--color-orange-50);
+  color: #1f2937;
+}
+
+}
