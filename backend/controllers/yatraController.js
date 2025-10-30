@@ -19,7 +19,19 @@ export const getAllYatras = async (req, res) => {
 
 export const getYatraById = async (req, res) => {
   try {
-    const yatra = await Yatra.findById(req.params.id);
+    // 1. Cast the parameter to a Number and check for undefined/NaN
+    const yatraId = Number(req.params.id);
+
+    if (!req.params.id || isNaN(yatraId)) {
+       // Gracefully handle invalid or missing parameters
+      return res.status(404).json({
+        success: false,
+        message: 'Invalid or missing Yatra ID.'
+      });
+    }
+    
+    // 2. Use findOne with the explicit _id field (safer for non-ObjectId primary keys)
+    const yatra = await Yatra.findOne({ _id: yatraId });
 
     if (!yatra) {
       return res.status(404).json({

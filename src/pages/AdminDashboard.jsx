@@ -154,21 +154,44 @@ function AdminDashboard() {
             <div className="bg-white rounded-xl p-6 w-full max-w-lg my-10">
                 <h2 className="text-2xl font-bold text-gray-900 mb-6">{item ? 'Edit' : 'Add New'} {type.charAt(0).toUpperCase() + type.slice(1)}</h2>
                 <form onSubmit={handleFormSubmit} className="space-y-4">
-                   <input type="text" name="title" placeholder="Title *" value={formData.title || ''} onChange={handleChange} required className="w-full border p-2 rounded" />
+                  <input type="text" name="title" placeholder="Title *" value={formData.title || ''} onChange={handleChange} required className="w-full border p-2 rounded" />
                    <textarea name="description" placeholder="Description *" rows="3" value={formData.description || ''} onChange={handleChange} required className="w-full border p-2 rounded" />
-                   
                    {type === 'yatra' && (
                        <>
-                            <p className="text-sm text-gray-600">Yatra-specific details:</p>
-                           <input type="number" name="_id" placeholder="ID (must be unique number) *" value={formData._id || ''} onChange={handleChange} required disabled={item} className="w-full border p-2 rounded" />
-                           <input type="date" name="date" placeholder="Date *" value={formData.date ? new Date(formData.date).toISOString().split('T')[0] : ''} onChange={handleChange} required className="w-full border p-2 rounded" />
+                            <p className="text-sm font-semibold pt-2 text-orange-700">Yatra-specific Details (All fields are required)</p>
+                           
+                           {/* --- START: Mandatory Fields Added Here --- */}
+                           
+                           {/* _id: Number, Required by model */}
+                           <input type="number" name="_id" placeholder="ID (Unique Number, e.g., 4) *" value={formData._id || ''} onChange={handleChange} required disabled={item} className="w-full border p-2 rounded" />
+                           
+                           {/* duration: String, Required by model */}
                            <input type="text" name="duration" placeholder="Duration (e.g., 5 Days / 4 Nights) *" value={formData.duration || ''} onChange={handleChange} required className="w-full border p-2 rounded" />
+                           
+                           {/* date: String, Required by model */}
+                           <input type="date" name="date" placeholder="Date *" 
+                               value={formData.date ? new Date(formData.date).toISOString().split('T')[0] : ''} 
+                               onChange={handleChange} 
+                               required 
+                               className="w-full border p-2 rounded" 
+                           />
+                           
+                           {/* price: Number, Required by model */}
                            <input type="number" name="price" placeholder="Price (₹) *" value={formData.price || ''} onChange={handleChange} required className="w-full border p-2 rounded" />
+                           
+                           {/* image: String, Required by model */}
                            <input type="text" name="image" placeholder="Image URL *" value={formData.image || ''} onChange={handleChange} required className="w-full border p-2 rounded" />
-                           <input type="number" name="maxParticipants" placeholder="Max Participants *" value={formData.maxParticipants || ''} onChange={handleChange} required className="w-full border p-2 rounded" />
-                           <input type="number" name="availableSeats" placeholder="Available Seats *" value={formData.availableSeats || ''} onChange={handleChange} required className="w-full border p-2 rounded" />
-                            {/* Simple text input for highlights/included/excluded arrays for demo */}
-                            <textarea name="highlights" placeholder="Highlights (comma separated)" value={Array.isArray(formData.highlights) ? formData.highlights.join(', ') : formData.highlights || ''} onChange={handleChange} className="w-full border p-2 rounded" />
+                           
+                           {/* maxParticipants: Number, Required by model (default is 50) */}
+                           <input type="number" name="maxParticipants" placeholder="Max Participants *" value={formData.maxParticipants || 50} onChange={handleChange} required className="w-full border p-2 rounded" />
+                           
+                           {/* availableSeats: Number, Required by model (default is 50) */}
+                           <input type="number" name="availableSeats" placeholder="Available Seats *" value={formData.availableSeats || 50} onChange={handleChange} required className="w-full border p-2 rounded" />
+                           
+                           {/* Array Fields (Handled as Comma Separated Values) */}
+                           <textarea name="highlights" placeholder="Highlights (comma separated, e.g: Day 1, Day 2) *" value={Array.isArray(formData.highlights) ? formData.highlights.join(', ') : formData.highlights || ''} onChange={handleChange} required className="w-full border p-2 rounded" />
+                           <textarea name="included" placeholder="Included (comma separated) *" value={Array.isArray(formData.included) ? formData.included.join(', ') : formData.included || ''} onChange={handleChange} required className="w-full border p-2 rounded" />
+                           <textarea name="excluded" placeholder="Excluded (comma separated) *" value={Array.isArray(formData.excluded) ? formData.excluded.join(', ') : formData.excluded || ''} onChange={handleChange} required className="w-full border p-2 rounded" />
                        </>
                    )}
                    {type === 'video' && (
