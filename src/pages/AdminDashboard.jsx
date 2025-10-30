@@ -26,6 +26,12 @@ const fetchAdminData = async (endpoint) => {
     return data.data;
 };
 
+// Helper function to convert comma-separated string to array
+const csvToArray = (csv) => {
+    if (typeof csv !== 'string') return [];
+    return csv.split(',').map(item => item.trim()).filter(item => item.length > 0);
+};
+
 
 function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('yatras');
@@ -67,16 +73,17 @@ function AdminDashboard() {
     loadData();
   }, [navigate]);
   
-//   const handleLogout = () => {
-//     localStorage.removeItem('adminToken');
-//     navigate('/admin/login');
-//   };
+  const handleLogout = () => {
+    localStorage.removeItem('adminToken');
+    navigate('/admin/login');
+  };
 
   const handleDelete = async (id, type) => {
     if (!window.confirm(`Are you sure you want to delete this ${type} with ID ${id}?`)) return;
 
     const token = localStorage.getItem('adminToken');
-    const endpoint = type === 'yatra' ? `yatra/${id}` : `videos/${id}`;
+    // Note: The backend uses the singular 'yatra' route
+    const endpoint = type === 'yatras' ? `yatra/${id}` : `videos/${id}`; 
     
     try {
       const response = await fetch(`${BASE_URL}/${endpoint}`, {
@@ -87,7 +94,7 @@ function AdminDashboard() {
       if (!response.ok) throw new Error('Deletion failed');
       
       // Update state
-      if (type === 'yatra') {
+      if (type === 'yatras') {
         setYatras(prev => prev.filter(y => y._id !== id));
       } else {
         setVideos(prev => prev.filter(v => v._id !== id));
@@ -103,40 +110,108 @@ function AdminDashboard() {
   const [currentType, setCurrentType] = useState(null);
   
   const openForm = (type, item = null) => {
-    setCurrentType(type);
+    setCurrentType(type); // This sets type to 'yatras' or 'videos'
+    // When opening the form for edit, convert arrays back to CSV strings for display
+    if (item && type === 'yatras') {
+        item.highlights = Array.isArray(item.highlights) ? item.highlights.join(', ') : '';
+        item.included = Array.isArray(item.included) ? item.included.join(', ') : '';
+        item.excluded = Array.isArray(item.excluded) ? item.excluded.join(', ') : '';
+    }
     setCurrentEdit(item);
     setIsFormOpen(true);
   };
   
+  // --- FormModal Component (Complete and Corrected with Grid UI) ---
   const FormModal = ({ type, item, onClose }) => {
-    const [formData, setFormData] = useState(item || { category: 'yatra' }); // Default category for videos
+    // Initialize required array fields for "Add New" operation
+    const initialFormData = item || { 
+        category: 'yatra',
+        highlights: '', // Initialize as string for form binding
+        included: '',
+        excluded: '',
+        itinerary: []
+    };
+    
+    const [formData, setFormData] = useState(initialFormData); 
     const [isSaving, setIsSaving] = useState(false);
+    const [submitError, setSubmitError] = useState(null); // NEW STATE for error display
+
+    const formGroupClass = "flex flex-col space-y-1";
+    const inputClass = "w-full p-2.5 border border-gray-300 rounded-lg shadow-sm focus:ring-orange-500 focus:border-orange-500 text-gray-900 placeholder:text-gray-400";
+    const labelClass = "text-sm font-medium text-gray-700";
+
     
     const handleFormSubmit = async (e) => {
       e.preventDefault();
       setIsSaving(true);
+      setSubmitError(null); // Clear previous error
       
       const token = localStorage.getItem('adminToken');
       const method = item ? 'PUT' : 'POST';
-      const endpoint = type === 'yatra' ? `yatra/${item ? item._id : ''}` : `videos/${item ? item._id : ''}`;
+      // Use singular 'yatra' in the endpoint path for the API
+      const endpoint = type === 'yatras' ? `yatra/${item ? item._id : ''}` : `videos/${item ? item._id : ''}`; 
       
+      // --- CLIENT-SIDE VALIDATION CHECK FOR YATRAS ---
+      if (type === 'yatras') {
+          if (isNaN(Number(formData.price)) || Number(formData.price) <= 0 || !formData.date || !formData.destination) {
+              setSubmitError("Please ensure Price, Destination, and Start Date are valid.");
+              setIsSaving(false);
+              return;
+          }
+      }
+      // --- END CLIENT-SIDE VALIDATION ---
+
       try {
-          const response = await fetch(`${BASE_URL}/${endpoint}`, {
+          // Prepare the final payload, converting CSV strings back to arrays for yatra
+          const payload = { ...formData };
+          if (type === 'yatras') { 
+              // Convert the CSV strings back into arrays before sending to the backend
+              payload.highlights = csvToArray(payload.highlights);
+              payload.included = csvToArray(payload.included);
+              payload.excluded = csvToArray(payload.excluded);
+              // Ensure numerical types are cast for safety
+              payload.price = Number(payload.price);
+              payload.maxParticipants = Number(payload.maxParticipants);
+              payload.availableSeats = Number(payload.availableSeats);
+          }
+
+
+          const response = await fetch(`http://localhost:5000/api/${endpoint}`, {
               method: method,
               headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-              body: JSON.stringify(formData)
+              body: JSON.stringify(payload)
           });
           
           if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.message || 'Failed to save data');
+            
+            // --- ENHANCED ERROR HANDLING STARTS HERE ---
+            const responseText = await response.text();
+            let errorData;
+            
+            try {
+                errorData = JSON.parse(responseText);
+            } catch (jsonErr) {
+                setSubmitError(`Server Error: Could not parse response. Raw Message: ${responseText.substring(0, 100)}...`);
+                throw new Error(responseText);
+            }
+
+            let errorMessage = errorData.message || 'Failed to save data. Unknown API error.';
+            if (errorData.code === 11000) { 
+                errorMessage = "Error: This Yatra ID already exists. Please choose a unique ID.";
+            }
+
+            setSubmitError(errorMessage); 
+            throw new Error(errorMessage);
           }
           
-          // Simple refresh/state update to reflect changes
+          // Successful save
           window.location.reload(); 
           onClose();
       } catch (err) {
-          alert(`Error saving ${type}: ${err.message}`);
+          if (!submitError) { 
+               setSubmitError(`Network Error: ${err.message}. Check if backend is running.`);
+          }
+      } finally {
           setIsSaving(false);
       }
     };
@@ -150,75 +225,167 @@ function AdminDashboard() {
     };
     
     return (
-        <div className="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-[100] p-4 overflow-y-auto">
-            <div className="bg-white rounded-xl p-6 w-full max-w-lg my-10">
-                <h2 className="text-2xl font-bold text-gray-900 mb-6">{item ? 'Edit' : 'Add New'} {type.charAt(0).toUpperCase() + type.slice(1)}</h2>
-                <form onSubmit={handleFormSubmit} className="space-y-4">
-                  <input type="text" name="title" placeholder="Title *" value={formData.title || ''} onChange={handleChange} required className="w-full border p-2 rounded" />
-                   <textarea name="description" placeholder="Description *" rows="3" value={formData.description || ''} onChange={handleChange} required className="w-full border p-2 rounded" />
-                   {type === 'yatra' && (
-                       <>
-                            <p className="text-sm font-semibold pt-2 text-orange-700">Yatra-specific Details (All fields are required)</p>
+        <div className="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-[100] p-8 overflow-y-auto">
+            <div className="bg-white rounded-xl w-full max-w-4xl my-10 overflow-hidden">
+                
+                {/* Header */}
+                <div className="flex justify-between items-center p-4 border-b border-gray-200">
+                    <h2 className="text-xl font-bold text-gray-900">
+                       {item ? 'Edit Existing Yatra' : 'Add New Yatras'}
+                    </h2>
+                     <button type="button" onClick={onClose} className="text-gray-500 hover:text-gray-700">
+                        &times;
+                    </button>
+                </div>
+
+                <form onSubmit={handleFormSubmit} className="p-6 space-y-6">
+                    
+                    {/* Yatra-specific Form Structure (Grid) */}
+                    {type === 'yatras' && (
+                        <div className="space-y-6">
+                            
+                            {/* Row 1: Title and Destination (2-Column Grid) */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+                                <div className={formGroupClass}>
+                                    <label className={labelClass} htmlFor="title">Title *</label>
+                                    <input type="text" id="title" name="title" placeholder="e.g., Kashi Vishwanath Yatra" value={formData.title || ''} onChange={handleChange} required className={inputClass} />
+                                </div>
+                                
+                                <div className={formGroupClass}>
+                                    <label className={labelClass} htmlFor="destination">Destination *</label>
+                                    <input type="text" id="destination" name="destination" placeholder="e.g., Varanasi" value={formData.destination || ''} onChange={handleChange} required className={inputClass} />
+                                </div>
+                            </div>
+                            
+                            {/* Row 2: Duration and Price (2-Column Grid) */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+                                <div className={formGroupClass}>
+                                    <label className={labelClass} htmlFor="duration">Duration *</label>
+                                    <input type="text" id="duration" name="duration" placeholder="e.g., 5 Days / 4 Nights" value={formData.duration || ''} onChange={handleChange} required className={inputClass} />
+                                </div>
+                                
+                                <div className={formGroupClass}>
+                                    <label className={labelClass} htmlFor="price">Price (₹) *</label>
+                                    <input type="number" id="price" name="price" placeholder="e.g., 15000" value={formData.price || ''} onChange={handleChange} required className={inputClass} />
+                                </div>
+                            </div>
+                            
+                            {/* Row 3: Image URL (Full Width) */}
+                            <div className={formGroupClass}>
+                                <label className={labelClass} htmlFor="image">Image"Image URL *</label>
+                                <input type="text" id="image" name="image" placeholder="/images/your-image.jpg" value={formData.image || ''} onChange={handleChange} required className={inputClass} />
+                                <p className="text-xs text-gray-500">Place image in frontend's public/images folder and use path like /images/imagename.jpg</p>
+                            </div>
+                            
+                            {/* Row 4: Description (Full Width) */}
+                            <div className={formGroupClass}>
+                                <label className={labelClass} htmlFor="description">Description *</label>
+                                <textarea id="description" name="description" placeholder="Detailed description of the Yatra" rows="3" value={formData.description || ''} onChange={handleChange} required className={inputClass}></textarea>
+                            </div>
+
+                            {/* Additional Required Fields (Hidden for the requested UI style, but still necessary for DB) */}
+                            <div className="grid grid-cols-2 gap-x-8 gap-y-4 pt-4 border-t border-gray-100">
+                                
+                                {/* Yatra ID */}
+                                <div className={formGroupClass}>
+                                    <label className={labelClass} htmlFor="_id">Yatra ID (Unique Number) *</label>
+                                    <input type="number" id="_id" name="_id" placeholder="ID (e.g., 4)" value={formData._id || ''} onChange={handleChange} required disabled={item} className={inputClass} />
+                                </div>
+                                
+                                {/* Date */}
+                                <div className={formGroupClass}>
+                                    <label className={labelClass} htmlFor="date">Start Date *</label>
+                                    <input type="date" id="date" name="date" 
+                                        value={formData.date ? new Date(formData.date).toISOString().split('T')[0] : ''} 
+                                        onChange={handleChange} 
+                                        required 
+                                        className={inputClass} 
+                                    />
+                                </div>
+                                
+                                {/* Max Participants */}
+                                <div className={formGroupClass}>
+                                    <label className={labelClass} htmlFor="maxParticipants">Max Participants *</label>
+                                    <input type="number" id="maxParticipants" name="maxParticipants" placeholder="e.g., 50" value={formData.maxParticipants || 50} onChange={handleChange} required className={inputClass} />
+                                </div>
+                                
+                                {/* Available Seats */}
+                                <div className={formGroupClass}>
+                                    <label className={labelClass} htmlFor="availableSeats">Available Seats *</label>
+                                    <input type="number" id="availableSeats" name="availableSeats" placeholder="e.g., 50" value={formData.availableSeats || 50} onChange={handleChange} required className={inputClass} />
+                                </div>
+                            </div>
+                            
+                            {/* Array/CSV Fields (Using grid for organization) */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-4 pt-4 border-t border-gray-100">
+                                
+                                {/* Highlights */}
+                                <div className={formGroupClass}>
+                                    <label className={labelClass} htmlFor="highlights">Highlights (CSV) *</label>
+                                    <textarea id="highlights" name="highlights" placeholder="Ganga Aarti, Boat Ride, Temple Darshan" rows="3" value={Array.isArray(formData.highlights) ? formData.highlights.join(', ') : formData.highlights || ''} onChange={handleChange} required className={inputClass} />
+                                </div>
+                                
+                                {/* Included */}
+                                <div className={formGroupClass}>
+                                    <label className={labelClass} htmlFor="included">Included (CSV) *</label>
+                                    <textarea id="included" name="included" placeholder="Accommodation, Meals, Transport" rows="3" value={Array.isArray(formData.included) ? formData.included.join(', ') : formData.included || ''} onChange={handleChange} required className={inputClass} />
+                                </div>
+                                
+                                {/* Excluded */}
+                                <div className={formGroupClass}>
+                                    <label className={labelClass} htmlFor="excluded">Excluded (CSV) *</label>
+                                    <textarea id="excluded" name="excluded" placeholder="Airfare, Personal Expenses, Insurance" rows="3" value={Array.isArray(formData.excluded) ? formData.excluded.join(', ') : formData.excluded || ''} onChange={handleChange} required className={inputClass} />
+                                </div>
+                            </div>
+
+                        </div>
+                    )}
+
+                    {/* Video-specific Fields */}
+                    {type === 'videos' && (
+                       <div className="space-y-4">
+                           <p className="text-sm font-semibold pt-2 text-orange-700">Video-specific details:</p>
+                           <label className="block text-sm font-medium text-gray-700 mt-2">Video URL *</label>
+                           <input type="text" name="videoUrl" placeholder="Video URL *" value={formData.videoUrl || ''} onChange={handleChange} required className={inputClass} />
                            
-                           {/* --- START: Mandatory Fields Added Here --- */}
+                           <label className="block text-sm font-medium text-gray-700 mt-2">Thumbnail URL *</label>
+                           <input type="text" name="thumbnailUrl" placeholder="Thumbnail URL *" value={formData.thumbnailUrl || ''} onChange={handleChange} required className={inputClass} />
                            
-                           {/* _id: Number, Required by model */}
-                           <input type="number" name="_id" placeholder="ID (Unique Number, e.g., 4) *" value={formData._id || ''} onChange={handleChange} required disabled={item} className="w-full border p-2 rounded" />
-                           
-                           {/* duration: String, Required by model */}
-                           <input type="text" name="duration" placeholder="Duration (e.g., 5 Days / 4 Nights) *" value={formData.duration || ''} onChange={handleChange} required className="w-full border p-2 rounded" />
-                           
-                           {/* date: String, Required by model */}
-                           <input type="date" name="date" placeholder="Date *" 
-                               value={formData.date ? new Date(formData.date).toISOString().split('T')[0] : ''} 
-                               onChange={handleChange} 
-                               required 
-                               className="w-full border p-2 rounded" 
-                           />
-                           
-                           {/* price: Number, Required by model */}
-                           <input type="number" name="price" placeholder="Price (₹) *" value={formData.price || ''} onChange={handleChange} required className="w-full border p-2 rounded" />
-                           
-                           {/* image: String, Required by model */}
-                           <input type="text" name="image" placeholder="Image URL *" value={formData.image || ''} onChange={handleChange} required className="w-full border p-2 rounded" />
-                           
-                           {/* maxParticipants: Number, Required by model (default is 50) */}
-                           <input type="number" name="maxParticipants" placeholder="Max Participants *" value={formData.maxParticipants || 50} onChange={handleChange} required className="w-full border p-2 rounded" />
-                           
-                           {/* availableSeats: Number, Required by model (default is 50) */}
-                           <input type="number" name="availableSeats" placeholder="Available Seats *" value={formData.availableSeats || 50} onChange={handleChange} required className="w-full border p-2 rounded" />
-                           
-                           {/* Array Fields (Handled as Comma Separated Values) */}
-                           <textarea name="highlights" placeholder="Highlights (comma separated, e.g: Day 1, Day 2) *" value={Array.isArray(formData.highlights) ? formData.highlights.join(', ') : formData.highlights || ''} onChange={handleChange} required className="w-full border p-2 rounded" />
-                           <textarea name="included" placeholder="Included (comma separated) *" value={Array.isArray(formData.included) ? formData.included.join(', ') : formData.included || ''} onChange={handleChange} required className="w-full border p-2 rounded" />
-                           <textarea name="excluded" placeholder="Excluded (comma separated) *" value={Array.isArray(formData.excluded) ? formData.excluded.join(', ') : formData.excluded || ''} onChange={handleChange} required className="w-full border p-2 rounded" />
-                       </>
-                   )}
-                   {type === 'video' && (
-                       <>
-                           <p className="text-sm text-gray-600">Video-specific details:</p>
-                           <input type="text" name="videoUrl" placeholder="Video URL *" value={formData.videoUrl || ''} onChange={handleChange} required className="w-full border p-2 rounded" />
-                           <input type="text" name="thumbnailUrl" placeholder="Thumbnail URL *" value={formData.thumbnailUrl || ''} onChange={handleChange} required className="w-full border p-2 rounded" />
-                           <select name="category" value={formData.category || ''} onChange={handleChange} required className="w-full border p-2 rounded">
+                           <label className="block text-sm font-medium text-gray-700 mt-2">Category *</label>
+                           <select name="category" value={formData.category || ''} onChange={handleChange} required className={inputClass}>
                              <option value="yatra">Yatra</option>
                              <option value="testimonial">Testimonial</option>
                              <option value="guide">Guide</option>
                              <option value="highlight">Highlight</option>
                              <option value="other">Other</option>
                            </select>
-                           <input type="text" name="duration" placeholder="Duration (e.g., 5:30)" value={formData.duration || ''} onChange={handleChange} className="w-full border p-2 rounded" />
-                           <div className="flex items-center space-x-2">
+                           
+                           <label className="block text-sm font-medium text-gray-700 mt-2">Duration (e.g., 5:30)</label>
+                           <input type="text" name="duration" placeholder="Duration (e.g., 5:30)" value={formData.duration || ''} onChange={handleChange} className={inputClass} />
+                           
+                           <div className="flex items-center space-x-2 pt-2">
                                 <input type="checkbox" id="isActive" name="isActive" checked={formData.isActive !== undefined ? formData.isActive : true} onChange={handleChange} className="rounded text-orange-600 focus:ring-orange-500" />
                                 <label htmlFor="isActive" className="text-sm text-gray-700">Is Active (Show on frontend)</label>
                            </div>
-                       </>
+                       </div>
                    )}
-                   <div className="flex justify-end space-x-3 pt-4">
-                       <button type="button" onClick={onClose} className="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded transition-colors">Cancel</button>
-                       <button type="submit" disabled={isSaving} className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded transition-colors disabled:opacity-60">
-                           {isSaving ? 'Saving...' : 'Save Changes'}
-                       </button>
-                   </div>
+
+                    {/* Error Display */}
+                    {submitError && (
+                        <div className="p-3 bg-red-100 border border-red-400 text-red-700 rounded text-sm font-medium">
+                            **Error:** {submitError}
+                        </div>
+                    )}
+
+                    {/* Action Buttons (Footer - Matching Image Style) */}
+                    <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
+                        <button type="button" onClick={onClose} className="py-2 px-4 rounded-lg font-bold bg-gray-300 hover:bg-gray-400 text-gray-800 transition-colors">
+                            Cancel
+                        </button>
+                        <button type="submit" disabled={isSaving} className="py-2 px-4 rounded-lg font-bold bg-green-600 hover:bg-green-700 text-white transition-colors disabled:opacity-60">
+                            {isSaving ? 'Saving...' : 'Save Changes'}
+                        </button>
+                    </div>
                 </form>
             </div>
         </div>
@@ -232,7 +399,7 @@ function AdminDashboard() {
         <thead className="bg-gray-50">
           <tr>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID / Title</th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{type === 'yatra' ? 'Price / Seats' : 'Category / Views'}</th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{type === 'yatras' ? 'Price / Seats' : 'Category / Views'}</th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
           </tr>
         </thead>
@@ -243,7 +410,7 @@ function AdminDashboard() {
                  **ID {item._id}**: {item.title}
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                {type === 'yatra' 
+                {type === 'yatras' 
                   ? `₹${item.price ? item.price.toLocaleString('en-IN') : 'N/A'} / ${item.availableSeats} Seats` 
                   : `${item.category} / ${item.views || 0} Views`}
               </td>
@@ -268,7 +435,16 @@ function AdminDashboard() {
   
   return (
     <div className="container mx-auto px-4 py-8 max-w-7xl">
-      {/* ... (Header and Logout Button) */}
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-3xl font-extrabold text-gray-900">Admin Dashboard</h1>
+        <button 
+          onClick={handleLogout} 
+          className="flex items-center text-red-600 hover:text-red-800 font-medium transition-colors"
+        >
+           <FaSignOutAlt className="mr-2" />
+           Logout
+        </button>
+      </div>
 
       {/* Tabs */}
       <div className="border-b border-gray-200 mb-6">
@@ -326,8 +502,8 @@ function AdminDashboard() {
       
       {/* Tables */}
       <div className="py-4">
-        {activeTab === 'yatras' && renderTable(yatras, 'yatra')}
-        {activeTab === 'videos' && renderTable(videos, 'video')}
+        {activeTab === 'yatras' && renderTable(yatras, 'yatras')}
+        {activeTab === 'videos' && renderTable(videos, 'videos')}
         {/* Registration table is now a separate page */}
       </div>
       

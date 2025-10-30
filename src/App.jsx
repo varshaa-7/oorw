@@ -17,7 +17,8 @@ import Registration from './pages/Registration.jsx';
 import AdminLogin from './pages/AdminLogin.jsx'; // NEW
 import AdminDashboard from './pages/AdminDashboard.jsx'; // NEW
 import AdminRegister from './pages/AdminRegister.jsx';
-
+import { AdminRegistrations } from './pages/AdminRegistrations.jsx';
+import RegistrationDetail from './pages/RegistrationDetail.jsx';
 function App() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -39,6 +40,8 @@ function App() {
             <Route path="/admin/login" element={<AdminLogin />} />
             <Route path="/admin/dashboard" element={<AdminDashboard />} />
             <Route path="/admin/register" element={<AdminRegister />} />
+            <Route path="/admin/registrations" element={<AdminRegistrations />} />
+            <Route path="/admin/registrations/:id" element={<RegistrationDetail />} />
           </Routes>
         </main>
 

@@ -14,7 +14,8 @@ export const createRegistration = async (req, res) => {
       emergencyContact,
       healthDeclaration,
       selectedYatra,
-      yatraTitle
+      yatraTitle,
+      documentUrl
     } = req.body;
 
     if (!name || !age || !mobile || !email || !address || !idProof || !idProofNumber || !selectedYatra) {
@@ -51,7 +52,8 @@ export const createRegistration = async (req, res) => {
       emergencyContact,
       healthDeclaration,
       selectedYatra,
-      yatraTitle: yatraTitle || yatra.title
+      yatraTitle: yatraTitle || yatra.title,
+      documentUrl
     });
 
     yatra.availableSeats -= 1;

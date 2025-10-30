@@ -48,6 +48,9 @@ const registrationSchema = new mongoose.Schema({
     conditions: String,
     medications: String
   },
+  documentUrl: { 
+    type: String
+  },
   selectedYatra: {
     type: Number,
     ref: 'Yatra',
