@@ -1,35 +1,58 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import toursData from '../data/tour.json';
+// import toursData from '../data/tour.json'; // REMOVED HARDCODED IMPORT
 
 const API_BASE_URL = 'http://localhost:5000/api/registration';
+const API_YATRAS_URL = 'http://localhost:5000/api/yatra'; // Backend endpoint for all yatras
 
 function Registration() {
   const [formData, setFormData] = useState({
     name: '', numPersons: '', mobile: '', email: '', city: '', travelMode: '', message: '',
     age: '', idProofType: '', selectedYatraId: '', healthDeclaration: '',
-    // --- FILE FIELD REMAINS ---
     idProofImage: null, 
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState({ success: false, message: '' });
+  
+  // --- NEW STATE FOR DYNAMIC YATRAS ---
+  const [availableYatras, setAvailableYatras] = useState([]);
+  const [isYatrasLoading, setIsYatrasLoading] = useState(true);
+  // --- END NEW STATE ---
+
+  // --- NEW EFFECT TO FETCH YATRAS ---
+  useEffect(() => {
+    const fetchYatras = async () => {
+      try {
+        const response = await fetch(API_YATRAS_URL);
+        if (!response.ok) {
+            throw new Error(`Failed to fetch yatras (${response.status})`);
+        }
+        const data = await response.json();
+        // The backend returns an object { success: true, data: [...] }
+        setAvailableYatras(data.data || []);
+      } catch (error) {
+        setSubmitStatus({ success: false, message: `Error loading Yatras: ${error.message}` });
+      } finally {
+        setIsYatrasLoading(false);
+      }
+    };
+    fetchYatras();
+  }, []);
+  // --- END NEW EFFECT ---
 
   const handleChange = (e) => {
     const { name, value, files } = e.target;
     
-    // Handle File Inputs
     if (files) {
         const file = files[0];
         if (file && file.size > 5 * 1024 * 1024) { // 5 MB limit
             alert('File size must be less than 5 MB');
-            e.target.value = ''; // Clear the input
+            e.target.value = '';
             return;
         }
         setFormData(prev => ({ ...prev, [name]: file }));
     } 
-    // Handle Text/Select Inputs
     else {
-        // Apply styling logic for selects (original functionality retained)
         if (e.target.tagName === 'SELECT' && value !== '') {
             e.target.classList.remove('text-gray-500');
             e.target.classList.add('text-gray-900');
@@ -55,12 +78,13 @@ function Registration() {
          return;
     }
 
-
     setIsSubmitting(true);
     setSubmitStatus({ success: false, message: '' });
     
-    // --- MOCK DOCUMENT URL FOR BACKEND ---
     const documentFileName = formData.idProofImage ? `${formData.idProofImage.name}` : 'document_missing.pdf';
+    
+    // Look up yatraTitle from the dynamically fetched list
+    const selectedYatra = availableYatras.find(t => t._id === Number(formData.selectedYatraId));
     
     const payload = {
         name: formData.name,
@@ -83,14 +107,12 @@ function Registration() {
         },
         
         selectedYatra: Number(formData.selectedYatraId),
-        yatraTitle: toursData.find(t => t.id === Number(formData.selectedYatraId))?.title || 'Unknown Yatra',
+        yatraTitle: selectedYatra ? selectedYatra.title : 'Unknown Yatra', // Use fetched title
         
-        // --- NEW: Document URL added to payload ---
         documentUrl: `/uploads/${documentFileName}` 
     };
     
     console.log("Registration Payload to API:", payload);
-    console.log("File to be sent (Reference Only):", formData.idProofImage ? formData.idProofImage.name : 'Missing');
 
     try {
         const response = await fetch(API_BASE_URL, {
@@ -119,12 +141,20 @@ function Registration() {
             setSubmitStatus({ success: false, message: 'Registration failed: ' + (data.message || 'Server Error') });
         }
     } catch (error) {
-        console.error('API Call Error:', error);
         setSubmitStatus({ success: false, message: 'Submission failed. Could not connect to server.' });
     } finally {
         setIsSubmitting(false);
     }
   };
+  
+  if (isYatrasLoading) {
+      return <div className="container mx-auto px-4 py-12 max-w-3xl text-center">Loading available Yatras...</div>;
+  }
+  
+  if (availableYatras.length === 0) {
+      return <div className="container mx-auto px-4 py-12 max-w-3xl text-center text-red-600">No Yatras are currently active. Please check back later.</div>;
+  }
+
 
   return (
     <div className="container mx-auto px-4 py-12 max-w-3xl">
@@ -148,18 +178,21 @@ function Registration() {
               <option value="Passport">Passport</option>
             </select>
             
+            {/* --- MODIFIED: Use dynamically fetched availableYatras --- */}
             <select name="selectedYatraId" value={formData.selectedYatraId} onChange={handleChange} required className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white ${!formData.selectedYatraId ? 'text-gray-500' : 'text-gray-800'}`}>
               <option value="" disabled>Booking For Yatra *</option>
-              {toursData.map((tour) => (
-                <option key={tour.id} value={tour.id}>
+              {availableYatras.map((tour) => (
+                <option key={tour._id} value={tour._id}>
                   {tour.title} (₹{tour.price.toLocaleString('en-IN')})
                 </option>
               ))}
             </select>
-             {/* <select name="travelMode" value={formData.travelMode} onChange={handleChange} className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white ${!formData.travelMode ? 'text-gray-500' : 'text-gray-800'}`}>
+            {/* --- END MODIFIED --- */}
+            
+             <select name="travelMode" value={formData.travelMode} onChange={handleChange} className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white ${!formData.travelMode ? 'text-gray-500' : 'text-gray-800'}`}>
                 <option value="">Preferred Travel Mode</option>
                 <option value="Bus">Bus</option> <option value="Train">Train</option> <option value="Flight">Flight</option> <option value="Own Vehicle">Own Vehicle</option> <option value="Other">Other</option>
-              </select> */}
+              </select>
           </div>
           
           <textarea name="healthDeclaration" placeholder="Health Declaration* (Mention conditions/allergies or state 'Fit for travel')" rows="3" value={formData.healthDeclaration} onChange={handleChange} required className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent mt-4"></textarea>
