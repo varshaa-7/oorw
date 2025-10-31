@@ -118,14 +118,12 @@ function YatraDetails() {
 
           {/* Action Buttons */}
           <div className="flex flex-col sm:flex-row items-center gap-4 border-t border-gray-200 pt-8">
-            <a
-              href="https://www.razorpay.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-full sm:w-auto text-center bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 px-8 rounded-full shadow-lg transition-all duration-300 transform hover:scale-105"
-            >
-              Book Now (₹{tour.price.toLocaleString('en-IN')})
-            </a>
+            <Link
+                          to="/registration"
+                          className="w-full sm:w-auto text-center bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-full shadow-lg transition-all duration-300"
+                        >
+                          Book Now (₹{tour.price.toLocaleString('en-IN')})
+                        </Link>
             <Link
               to="/registration"
               className="w-full sm:w-auto text-center bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-full shadow-lg transition-all duration-300"

@@ -221,7 +221,6 @@ const RegistrationPageContent = ({ yatras, onBackToDashboard }) => {
                                             {new Date(reg.registrationDate).toLocaleDateString()}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                            //commenting for now
                                             {/* <button onClick={() => handleViewDetails(reg._id)} title="View/Edit" className="text-blue-600 hover:text-blue-900 mr-3 p-1">
                                                 <FaEye />
                                             </button> */}
